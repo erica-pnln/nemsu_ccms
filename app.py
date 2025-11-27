@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
-import psycopg2
-from psycopg2.extras import DictCursor
+import psycopg
+from psycopg.rows import dict_row
 from datetime import datetime
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -39,11 +39,10 @@ def add_header(response):
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
     
-    # Fix for Render PostgreSQL URL format
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     
-    conn = psycopg2.connect(database_url)
+    conn = psycopg.connect(database_url, row_factory=dict_row)
     return conn
 
 # File upload configuration
@@ -1010,3 +1009,4 @@ if __name__ == '__main__':
         print("⚠️  PDF export disabled - install reportlab package for PDF support")
 
     app.run(debug=True, port=port, host=host)
+
