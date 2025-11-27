@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
-from flask_mysqldb import MySQL
+import psycopg2
+from psycopg2.extras import DictCursor
 from datetime import datetime
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,8 +25,7 @@ except ImportError:
     print("PDF export disabled - reportlab not installed")
 
 app = Flask(__name__)
-app.secret_key = 'nemsu_ccms_secret_key_2024'
-
+app.secret_key = os.environ.get('SECRET_KEY', 'nemsu_ccms_secret_key_2024')
 
 # Disable caching
 @app.after_request
@@ -35,13 +35,16 @@ def add_header(response):
     response.headers['Expires'] = '-1'
     return response
 
-
-# MySQL Configuration
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'erica2123'
-app.config['MYSQL_DB'] = 'nemsu_ccms'
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+# PostgreSQL Configuration for Render
+def get_db_connection():
+    database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
+    
+    # Fix for Render PostgreSQL URL format
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
+    conn = psycopg2.connect(database_url)
+    return conn
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -56,24 +59,18 @@ app.config['MAIL_PASSWORD'] = 'your_app_password_here'
 app.config['MAIL_DEFAULT_SENDER'] = 'nemsu.ccms@gmail.com'
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
-mysql = MySQL(app)
-
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 def is_logged_in():
     return 'user_id' in session
-
 
 def is_admin():
     return session.get('role') == 'admin'
 
-
 def is_student():
     return session.get('role') == 'student'
-
 
 def send_email(to_email, subject, message):
     """Send email to student - Currently in development mode (prints to console)"""
@@ -95,7 +92,6 @@ def send_email(to_email, subject, message):
     except Exception as e:
         print(f"❌ Email error: {str(e)}")
         return False
-
 
 # Automatic Response Templates
 RESPONSE_TEMPLATES = {
@@ -128,22 +124,18 @@ NEMSU Administration"""
     }
 }
 
-
 # Main Website Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
 @app.route('/about')
 def about():
     return render_template('about.html')
 
-
 @app.route('/contact')
 def contact():
     return render_template('contact.html')
-
 
 # Student Authentication
 @app.route('/student/login', methods=['GET', 'POST'])
@@ -155,10 +147,12 @@ def student_login():
         username = request.form['username']
         password = request.form['password']
 
-        cur = mysql.connection.cursor()
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'student'", (username,))
         user = cur.fetchone()
         cur.close()
+        conn.close()
 
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
@@ -171,7 +165,6 @@ def student_login():
         else:
             flash('Invalid student credentials', 'danger')
     return render_template('student_login.html')
-
 
 @app.route('/student/register', methods=['GET', 'POST'])
 def student_register():
@@ -186,22 +179,23 @@ def student_register():
         student_id = request.form['student_id']
         hashed_password = generate_password_hash(password)
 
-        cur = mysql.connection.cursor()
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
         try:
             cur.execute(
                 "INSERT INTO users (username, password, email, full_name, student_id, role) VALUES (%s, %s, %s, %s, %s, 'student')",
                 (username, hashed_password, email, full_name, student_id)
             )
-            mysql.connection.commit()
+            conn.commit()
             flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('student_login'))
         except Exception as e:
-            mysql.connection.rollback()
+            conn.rollback()
             flash('Registration failed. Username or email may already exist.', 'danger')
         finally:
             cur.close()
+            conn.close()
     return render_template('student_register.html')
-
 
 # Admin Authentication
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -213,10 +207,12 @@ def admin_login():
         username = request.form['username']
         password = request.form['password']
 
-        cur = mysql.connection.cursor()
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'admin'", (username,))
         user = cur.fetchone()
         cur.close()
+        conn.close()
 
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
@@ -229,22 +225,26 @@ def admin_login():
             flash('Invalid admin credentials', 'danger')
     return render_template('admin_login.html')
 
-
 # Student Dashboard and Features
 @app.route('/student/dashboard')
 def student_dashboard():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE student_id = %s", (session['user_id'],))
     total_complaints = cur.fetchone()['total']
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE student_id = %s AND status = 'Pending'",
                 (session['user_id'],))
     pending_complaints = cur.fetchone()['total']
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE student_id = %s AND status = 'Solved'",
                 (session['user_id'],))
     solved_complaints = cur.fetchone()['total']
+    
     cur.execute("""
         SELECT c.id, c.created_at, cc.name as category, c.status 
         FROM complaints c 
@@ -255,13 +255,14 @@ def student_dashboard():
     """, (session['user_id'],))
     recent_complaints = cur.fetchall()
 
-    # Get unread messages count - FIXED QUERY
+    # Get unread messages count
     cur.execute("SELECT COUNT(*) as unread_count FROM messages WHERE receiver_id = %s AND is_read = FALSE",
                 (session['user_id'],))
     unread_result = cur.fetchone()
     unread_messages = unread_result['unread_count'] if unread_result else 0
 
     cur.close()
+    conn.close()
 
     return render_template('student_dashboard.html',
                            total_complaints=total_complaints,
@@ -270,13 +271,14 @@ def student_dashboard():
                            recent_complaints=recent_complaints,
                            unread_messages=unread_messages)
 
-
 @app.route('/student/report-complaint', methods=['GET', 'POST'])
 def report_complaint():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
     if request.method == 'POST':
         category_id = request.form['category']
         incident_date = request.form['incident_date']
@@ -297,8 +299,11 @@ def report_complaint():
             "INSERT INTO complaints (student_id, category_id, incident_date, incident_time, location, description, photo_path) VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (session['user_id'], category_id, incident_date, incident_time, location, description, photo_path)
         )
-        mysql.connection.commit()
-        complaint_id = cur.lastrowid
+        conn.commit()
+        
+        # Get the last inserted ID (PostgreSQL way)
+        cur.execute("SELECT LASTVAL()")
+        complaint_id = cur.fetchone()[0]
 
         # Send automatic email notification
         cur.execute("SELECT email, full_name FROM users WHERE id = %s", (session['user_id'],))
@@ -322,21 +327,23 @@ def report_complaint():
             send_email(student['email'], email_subject, email_message)
 
         cur.close()
+        conn.close()
         flash(f'Complaint submitted successfully! Your Complaint ID is: {complaint_id}', 'success')
         return redirect(url_for('previous_reports'))
 
     cur.execute("SELECT * FROM complaint_categories")
     categories = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('report_complaint.html', categories=categories)
-
 
 @app.route('/student/previous-reports')
 def previous_reports():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("""
         SELECT c.id, cc.name as category, c.status, c.created_at 
         FROM complaints c 
@@ -346,15 +353,16 @@ def previous_reports():
     """, (session['user_id'],))
     complaints = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('previous_reports.html', complaints=complaints)
-
 
 @app.route('/student/complaint-details/<int:complaint_id>')
 def complaint_details(complaint_id):
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("""
         SELECT c.*, cc.name as category_name, u.full_name, u.student_id
         FROM complaints c 
@@ -376,24 +384,26 @@ def complaint_details(complaint_id):
     else:
         responses = []
     cur.close()
+    conn.close()
 
     if not complaint:
         flash('Complaint not found or access denied', 'danger')
         return redirect(url_for('previous_reports'))
     return render_template('complaint_details.html', complaint=complaint, responses=responses)
 
-
 @app.route('/student/feedback', methods=['GET', 'POST'])
 def feedback():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT id FROM complaints WHERE student_id = %s AND status = 'Solved'", (session['user_id'],))
     solved_complaints = cur.fetchall()
 
     if not solved_complaints:
         cur.close()
+        conn.close()
         return render_template('feedback.html', feedback_allowed=False)
 
     if request.method == 'POST':
@@ -410,8 +420,10 @@ def feedback():
                 "INSERT INTO feedback (student_id, complaint_id, rating, comment) VALUES (%s, %s, %s, %s)",
                 (session['user_id'], complaint_id, rating, comment)
             )
-            mysql.connection.commit()
+            conn.commit()
             flash('Feedback submitted successfully!', 'success')
+        cur.close()
+        conn.close()
         return redirect(url_for('feedback'))
 
     cur.execute("""
@@ -422,8 +434,8 @@ def feedback():
     """, (session['user_id'],))
     solved_complaints = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('feedback.html', feedback_allowed=True, solved_complaints=solved_complaints)
-
 
 # FIXED MESSAGE FUNCTIONS
 @app.route('/student/private-message', methods=['GET', 'POST'])
@@ -431,7 +443,9 @@ def private_message():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
     if request.method == 'POST':
         message_text = request.form['message']
 
@@ -444,15 +458,16 @@ def private_message():
                 "INSERT INTO messages (sender_id, receiver_id, message) VALUES (%s, %s, %s)",
                 (session['user_id'], admin['id'], message_text)
             )
-            mysql.connection.commit()
+            conn.commit()
             flash('Message sent successfully to administrator!', 'success')
             print(f"DEBUG: Student {session['user_id']} sent message to admin {admin['id']}")
         else:
             flash('No administrator found. Please try again later.', 'danger')
         cur.close()
+        conn.close()
         return redirect(url_for('private_message'))
 
-    # Get message history (both sent and received) - FIXED QUERY
+    # Get message history (both sent and received)
     cur.execute("""
         SELECT m.*, 
                u_sender.full_name as sender_name,
@@ -470,17 +485,18 @@ def private_message():
         print(f"DEBUG: Message {msg['id']} - From: {msg['sender_name']}, To: {msg['receiver_name']}")
 
     cur.close()
+    conn.close()
     return render_template('private_message.html', messages=messages)
-
 
 @app.route('/student/inbox')
 def student_inbox():
     if not is_logged_in() or not is_student():
         return redirect(url_for('student_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
 
-    # FIXED: Get messages where student is the receiver
+    # Get messages where student is the receiver
     cur.execute("""
         SELECT m.*, u.full_name as sender_name, u.student_id 
         FROM messages m 
@@ -496,11 +512,11 @@ def student_inbox():
 
     # Mark messages as read
     cur.execute("UPDATE messages SET is_read = TRUE WHERE receiver_id = %s", (session['user_id'],))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
 
     return render_template('student_inbox.html', messages=messages)
-
 
 # Admin Dashboard and Features
 @app.route('/admin/dashboard')
@@ -508,15 +524,21 @@ def admin_dashboard():
     if not is_logged_in() or not is_admin():
         return redirect(url_for('admin_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
     cur.execute("SELECT COUNT(*) as total FROM users WHERE role = 'student'")
     total_students = cur.fetchone()['total']
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints")
     total_complaints = cur.fetchone()['total']
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE status = 'Pending'")
     pending_complaints = cur.fetchone()['total']
+    
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE status = 'Solved'")
     solved_complaints = cur.fetchone()['total']
+    
     cur.execute("""
         SELECT c.id, c.created_at, cc.name as category, u.full_name, u.student_id 
         FROM complaints c 
@@ -527,7 +549,7 @@ def admin_dashboard():
     """)
     recent_complaints = cur.fetchall()
 
-    # FIXED: Get recent messages for admin
+    # Get recent messages for admin
     cur.execute("""
         SELECT m.*, u.full_name as sender_name 
         FROM messages m 
@@ -539,6 +561,7 @@ def admin_dashboard():
     recent_messages = cur.fetchall()
 
     cur.close()
+    conn.close()
 
     return render_template('admin_dashboard.html',
                            total_students=total_students,
@@ -548,18 +571,18 @@ def admin_dashboard():
                            recent_complaints=recent_complaints,
                            recent_messages=recent_messages)
 
-
 @app.route('/admin/manage-students')
 def manage_students():
     if not is_logged_in() or not is_admin():
         return redirect(url_for('admin_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT * FROM users WHERE role = 'student'")
     students = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('manage_students.html', students=students)
-
 
 @app.route('/admin/manage-complaints')
 def manage_complaints():
@@ -568,7 +591,9 @@ def manage_complaints():
 
     category_filter = request.args.get('category', '')
     status_filter = request.args.get('status', '')
-    cur = mysql.connection.cursor()
+    
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
 
     query = """
         SELECT c.*, cc.name as category_name, u.full_name, u.student_id 
@@ -589,18 +614,22 @@ def manage_complaints():
     query += " ORDER BY c.created_at DESC"
     cur.execute(query, params)
     complaints = cur.fetchall()
+    
     cur.execute("SELECT * FROM complaint_categories")
     categories = cur.fetchall()
+    
     cur.close()
+    conn.close()
     return render_template('manage_complaints.html', complaints=complaints, categories=categories)
-
 
 @app.route('/admin/complaint-details/<int:complaint_id>', methods=['GET', 'POST'])
 def admin_complaint_details(complaint_id):
     if not is_logged_in() or not is_admin():
         return redirect(url_for('admin_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
     if request.method == 'POST':
         status = request.form['status']
 
@@ -623,7 +652,7 @@ def admin_complaint_details(complaint_id):
             "INSERT INTO admin_responses (complaint_id, admin_id, response) VALUES (%s, %s, %s)",
             (complaint_id, session['user_id'], automatic_response)
         )
-        mysql.connection.commit()
+        conn.commit()
 
         # Send automatic email notification
         if complaint_data and complaint_data['email']:
@@ -662,13 +691,14 @@ def admin_complaint_details(complaint_id):
         ORDER BY ar.created_at
     """, (complaint_id,))
     responses = cur.fetchall()
+    
     cur.close()
+    conn.close()
 
     return render_template('admin_complaint_details.html',
                            complaint=complaint,
                            responses=responses,
                            response_templates=RESPONSE_TEMPLATES)
-
 
 @app.route('/admin/reports')
 def admin_reports():
@@ -676,7 +706,9 @@ def admin_reports():
         return redirect(url_for('admin_login'))
 
     period = request.args.get('period', 'monthly')
-    cur = mysql.connection.cursor()
+    
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
 
     cur.execute("""
         SELECT cc.name, COUNT(c.id) as count 
@@ -689,43 +721,44 @@ def admin_reports():
 
     if period == 'weekly':
         cur.execute("""
-            SELECT YEAR(created_at) as year, WEEK(created_at) as week, COUNT(*) as count 
+            SELECT EXTRACT(YEAR FROM created_at) as year, EXTRACT(WEEK FROM created_at) as week, COUNT(*) as count 
             FROM complaints 
-            GROUP BY YEAR(created_at), WEEK(created_at) 
+            GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(WEEK FROM created_at) 
             ORDER BY year DESC, week DESC 
             LIMIT 12
         """)
     elif period == 'monthly':
         cur.execute("""
-            SELECT YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count 
+            SELECT EXTRACT(YEAR FROM created_at) as year, EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count 
             FROM complaints 
-            GROUP BY YEAR(created_at), MONTH(created_at) 
+            GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at) 
             ORDER BY year DESC, month DESC 
             LIMIT 12
         """)
     else:
         cur.execute("""
-            SELECT YEAR(created_at) as year, QUARTER(created_at) as quarter, COUNT(*) as count 
+            SELECT EXTRACT(YEAR FROM created_at) as year, EXTRACT(QUARTER FROM created_at) as quarter, COUNT(*) as count 
             FROM complaints 
-            GROUP BY YEAR(created_at), QUARTER(created_at) 
+            GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(QUARTER FROM created_at) 
             ORDER BY year DESC, quarter DESC 
             LIMIT 12
         """)
 
     complaint_stats = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('admin_reports.html',
                            complaint_types=complaint_types,
                            complaint_stats=complaint_stats,
                            period=period)
-
 
 @app.route('/admin/export/complaints/<format_type>')
 def export_complaints(format_type):
     if not is_logged_in() or not is_admin():
         return redirect(url_for('admin_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("""
         SELECT c.id, c.created_at, cc.name as category, u.full_name, u.student_id, u.email, c.status, c.location, c.description
         FROM complaints c 
@@ -735,6 +768,7 @@ def export_complaints(format_type):
     """)
     complaints = cur.fetchall()
     cur.close()
+    conn.close()
 
     if format_type == 'csv':
         try:
@@ -810,7 +844,6 @@ def export_complaints(format_type):
     flash('Invalid export format', 'danger')
     return redirect(url_for('admin_reports'))
 
-
 def generate_pdf_export(complaints):
     """Generate PDF export using reportlab"""
     try:
@@ -866,16 +899,16 @@ def generate_pdf_export(complaints):
     except Exception as e:
         raise Exception(f"PDF generation error: {str(e)}")
 
-
 # FIXED ADMIN MESSAGE FUNCTIONS
 @app.route('/admin/messages')
 def admin_messages():
     if not is_logged_in() or not is_admin():
         return redirect(url_for('admin_login'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
 
-    # FIXED: Get messages where admin is the receiver (messages from students)
+    # Get messages where admin is the receiver (messages from students)
     cur.execute("""
         SELECT m.*, u.full_name as sender_name, u.student_id 
         FROM messages m 
@@ -891,11 +924,11 @@ def admin_messages():
 
     # Mark messages as read
     cur.execute("UPDATE messages SET is_read = TRUE WHERE receiver_id = %s", (session['user_id'],))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
 
     return render_template('admin_messages.html', messages=messages)
-
 
 @app.route('/admin/send-message', methods=['GET', 'POST'])
 def admin_send_message():
@@ -906,37 +939,42 @@ def admin_send_message():
         student_id = request.form['student_id']
         message_text = request.form['message']
 
-        cur = mysql.connection.cursor()
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
 
-        # FIXED: Admin sends message to student (admin is sender, student is receiver)
+        # Admin sends message to student (admin is sender, student is receiver)
         cur.execute(
             "INSERT INTO messages (sender_id, receiver_id, message) VALUES (%s, %s, %s)",
             (session['user_id'], student_id, message_text)
         )
-        mysql.connection.commit()
+        conn.commit()
 
         print(f"DEBUG: Admin {session['user_id']} sent message to student {student_id}")
         flash('Message sent successfully to student!', 'success')
         cur.close()
+        conn.close()
         return redirect(url_for('admin_messages'))
 
     student_id = request.args.get('student_id')
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT id, full_name, student_id FROM users WHERE role = 'student'")
     students = cur.fetchall()
     cur.close()
+    conn.close()
     return render_template('admin_send_message.html', students=students, selected_student=student_id)
-
 
 @app.route('/mark_message_read/<int:message_id>', methods=['POST'])
 def mark_message_read(message_id):
     if not is_logged_in():
         return jsonify({'success': False})
 
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("UPDATE messages SET is_read = TRUE WHERE id = %s", (message_id,))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
 
     return jsonify({'success': True})
 
@@ -946,7 +984,6 @@ def logout():
     flash('You have been logged out', 'info')
     return redirect(url_for('index'))
 
-
 if __name__ == '__main__':
     # Clear template cache
     app.jinja_env.cache = {}
@@ -955,8 +992,13 @@ if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
 
-    # Run on port 5001
-    print("🚀 Starting NEMSU CCMS on port 5001...")
+    # Get port from environment variable or default to 5001
+    port = int(os.environ.get('PORT', 5001))
+    
+    # Run on the appropriate host for Render
+    host = '0.0.0.0' if 'RENDER' in os.environ else '127.0.0.1'
+    
+    print("🚀 Starting NEMSU CCMS...")
     print("🌐 Main Website: http://localhost:5001")
     print("🔧 Admin Panel: http://localhost:5001/admin/dashboard")
     print("📝 Student Login: http://localhost:5001/student/login")
@@ -967,4 +1009,4 @@ if __name__ == '__main__':
     if not PDF_SUPPORT:
         print("⚠️  PDF export disabled - install reportlab package for PDF support")
 
-    app.run(debug=True, port=5001, host='127.0.0.1')
+    app.run(debug=True, port=port, host=host)
