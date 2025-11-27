@@ -1,0 +1,152 @@
+manage_students.html
+{% extends "base.html" %}
+
+{% block title %}Manage Students - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users me-2"></i>Manage Students</h2>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Students Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ students|length }}</h4>
+                    <p class="mb-0">Total Students</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ students|selectattr('created_at')|list|length }}</h4>
+                    <p class="mb-0">Active Students</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>0</h4>
+                    <p class="mb-0">Complaints Today</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h4>0</h4>
+                    <p class="mb-0">Pending Actions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Students Table -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>Students List
+                <span class="badge bg-light text-primary ms-2">{{ students|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if students %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Full Name</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Registration Date</th>
+                            <th>Complaints</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td><strong>{{ student.student_id }}</strong></td>
+                            <td>{{ student.full_name }}</td>
+                            <td>{{ student.username }}</td>
+                            <td>{{ student.email }}</td>
+                            <td>{{ student.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <span class="badge bg-primary">View</span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('admin_send_message') }}?student_id={{ student.id }}" 
+                                       class="btn btn-outline-primary" title="Send Message">
+                                        <i class="fas fa-envelope"></i>
+                                    </a>
+                                    <button class="btn btn-outline-info" title="View Profile">
+                                        <i class="fas fa-user"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" title="View Complaints">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-users display-1 text-muted mb-3"></i>
+                <h4 class="text-muted">No Students Found</h4>
+                <p class="text-muted">No students have registered in the system yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card mt-4">
+        <div class="card-header bg-light">
+            <h5 class="card-title mb-0"><i class="fas fa-rocket me-2"></i>Quick Actions</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <a href="{{ url_for('admin_send_message') }}" class="btn btn-outline-primary text-start">
+                            <i class="fas fa-bullhorn me-2"></i>Broadcast Message
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <a href="{{ url_for('admin_reports') }}" class="btn btn-outline-success text-start">
+                            <i class="fas fa-chart-bar me-2"></i>Student Reports
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-info text-start" onclick="exportStudents()">
+                            <i class="fas fa-download me-2"></i>Export Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportStudents() {
+    alert('Export functionality would be implemented here. This would export student data to CSV/Excel.');
+}
+</script>
+{% endblock %}

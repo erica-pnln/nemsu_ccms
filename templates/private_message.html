@@ -1,0 +1,127 @@
+private_message.html
+{% extends "base.html" %}
+
+{% block title %}Private Message - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-envelope me-2"></i>Private Message to Admin
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Use this form to send a private message directly to the system administrator.
+                        This is useful for questions, clarifications, or additional information about your complaints.
+                    </div>
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Your Message</label>
+                            <textarea class="form-control" id="message" name="message" rows="6"
+                                      placeholder="Type your message here... Be clear and specific about your concern or question."
+                                      required></textarea>
+                            <div class="form-text">
+                                Maximum 1000 characters. Be concise but provide enough detail for the administrator to understand your concern.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urgent" name="urgent">
+                                <label class="form-check-label" for="urgent">
+                                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                                    Mark as urgent
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Use this only for time-sensitive matters requiring immediate attention.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane me-2"></i>Send Message
+                            </button>
+                            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Message History (if available) -->
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Message Guidelines
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-thumbs-up text-success me-2"></i>Do:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i> Be clear and specific</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Reference complaint IDs if applicable</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Use professional language</li>
+                                <li><i class="fas fa-check text-success me-2"></i> Provide necessary context</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-thumbs-down text-danger me-2"></i>Don't:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-times text-danger me-2"></i> Use offensive language</li>
+                                <li><i class="fas fa-times text-danger me-2"></i> Send multiple messages for the same issue</li>
+                                <li><i class="fas fa-times text-danger me-2"></i> Share personal sensitive information</li>
+                                <li><i class="fas fa-times text-danger me-2"></i> Mark non-urgent matters as urgent</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Time Information -->
+            <div class="alert alert-warning mt-4">
+                <h6><i class="fas fa-clock me-2"></i>Response Time</h6>
+                <p class="mb-0">
+                    Administrators typically respond within 1-2 business days. For urgent matters,
+                    please contact the appropriate office directly via phone.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('message').addEventListener('input', function() {
+    const maxLength = 1000;
+    const currentLength = this.value.length;
+    const counter = document.getElementById('charCounter') || (function() {
+        const counter = document.createElement('div');
+        counter.id = 'charCounter';
+        counter.className = 'form-text text-end';
+        this.parentNode.appendChild(counter);
+        return counter;
+    }).call(this);
+
+    counter.textContent = `${currentLength}/${maxLength} characters`;
+
+    if (currentLength > maxLength * 0.8) {
+        counter.classList.add('text-warning');
+    } else {
+        counter.classList.remove('text-warning');
+    }
+
+    if (currentLength > maxLength) {
+        this.value = this.value.substring(0, maxLength);
+    }
+});
+</script>
+{% endblock %}

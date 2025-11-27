@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Messages - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-inbox me-2"></i>Student Messages</h2>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_send_message') }}" class="btn btn-primary">
+                <i class="fas fa-paper-plane me-2"></i>Send Message
+            </a>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-comments me-2"></i>Messages from Students
+                <span class="badge bg-light text-primary ms-2">{{ messages|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if messages %}
+            <div class="list-group list-group-flush">
+                {% for message in messages %}
+                <div class="list-group-item {% if not message.is_read %}bg-light border-warning{% endif %}">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <i class="fas fa-user-circle fa-2x text-primary"></i>
+                        </div>
+                        <div class="col">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        {{ message.sender_name }}
+                                        {% if message.student_id %}
+                                        <small class="text-muted">({{ message.student_id }})</small>
+                                        {% endif %}
+                                        {% if not message.is_read %}
+                                        <span class="badge bg-warning ms-2">New</span>
+                                        {% endif %}
+                                    </h6>
+                                    <p class="mb-1">{{ message.message }}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        {{ message.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                </div>
+                                <div class="ms-3">
+                                    <a href="{{ url_for('admin_send_message', student_id=message.sender_id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-reply me-1"></i>Reply
+                                    </a>
+                                    {% if not message.is_read %}
+                                    <button onclick="markAsRead({{ message.id }})"
+                                            class="btn btn-sm btn-outline-success mt-1">
+                                        <i class="fas fa-check me-1"></i>Mark Read
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox display-1 text-muted mb-3"></i>
+                <h4 class="text-muted">No Messages</h4>
+                <p class="text-muted">You haven't received any messages from students yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsRead(messageId) {
+    fetch('/mark_message_read/' + messageId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const messageElement = document.querySelector(`[onclick="markAsRead(${messageId})"]`).closest('.list-group-item');
+            messageElement.classList.remove('bg-light', 'border-warning');
+            const markReadButton = document.querySelector(`[onclick="markAsRead(${messageId})"]`);
+            if (markReadButton) {
+                markReadButton.remove();
+            }
+            const newBadge = messageElement.querySelector('.badge.bg-warning');
+            if (newBadge) {
+                newBadge.remove();
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script>
+{% endblock %}
