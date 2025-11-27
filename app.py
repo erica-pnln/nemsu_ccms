@@ -36,7 +36,6 @@ def add_header(response):
     return response
 
 # PostgreSQL Configuration for Render
-# PostgreSQL Configuration for Render
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
     
@@ -149,7 +148,7 @@ def student_login():
         password = request.form['password']
 
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
+        cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'student'", (username,))
         user = cur.fetchone()
         cur.close()
@@ -181,7 +180,7 @@ def student_register():
         hashed_password = generate_password_hash(password)
 
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
+        cur = conn.cursor()
         try:
             cur.execute(
                 "INSERT INTO users (username, password, email, full_name, student_id, role) VALUES (%s, %s, %s, %s, %s, 'student')",
@@ -209,7 +208,7 @@ def admin_login():
         password = request.form['password']
 
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
+        cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'admin'", (username,))
         user = cur.fetchone()
         cur.close()
@@ -233,7 +232,7 @@ def student_dashboard():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE student_id = %s", (session['user_id'],))
     total_complaints = cur.fetchone()['total']
@@ -278,7 +277,7 @@ def report_complaint():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     
     if request.method == 'POST':
         category_id = request.form['category']
@@ -344,7 +343,7 @@ def previous_reports():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("""
         SELECT c.id, cc.name as category, c.status, c.created_at 
         FROM complaints c 
@@ -363,7 +362,7 @@ def complaint_details(complaint_id):
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("""
         SELECT c.*, cc.name as category_name, u.full_name, u.student_id
         FROM complaints c 
@@ -398,7 +397,7 @@ def feedback():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("SELECT id FROM complaints WHERE student_id = %s AND status = 'Solved'", (session['user_id'],))
     solved_complaints = cur.fetchall()
 
@@ -445,7 +444,7 @@ def private_message():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     
     if request.method == 'POST':
         message_text = request.form['message']
@@ -495,7 +494,7 @@ def student_inbox():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
 
     # Get messages where student is the receiver
     cur.execute("""
@@ -526,7 +525,7 @@ def admin_dashboard():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM users WHERE role = 'student'")
     total_students = cur.fetchone()['total']
@@ -578,7 +577,7 @@ def manage_students():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE role = 'student'")
     students = cur.fetchall()
     cur.close()
@@ -594,7 +593,7 @@ def manage_complaints():
     status_filter = request.args.get('status', '')
     
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
 
     query = """
         SELECT c.*, cc.name as category_name, u.full_name, u.student_id 
@@ -629,7 +628,7 @@ def admin_complaint_details(complaint_id):
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     
     if request.method == 'POST':
         status = request.form['status']
@@ -709,7 +708,7 @@ def admin_reports():
     period = request.args.get('period', 'monthly')
     
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
 
     cur.execute("""
         SELECT cc.name, COUNT(c.id) as count 
@@ -759,7 +758,7 @@ def export_complaints(format_type):
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("""
         SELECT c.id, c.created_at, cc.name as category, u.full_name, u.student_id, u.email, c.status, c.location, c.description
         FROM complaints c 
@@ -907,7 +906,7 @@ def admin_messages():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
 
     # Get messages where admin is the receiver (messages from students)
     cur.execute("""
@@ -941,7 +940,7 @@ def admin_send_message():
         message_text = request.form['message']
 
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
+        cur = conn.cursor()
 
         # Admin sends message to student (admin is sender, student is receiver)
         cur.execute(
@@ -958,7 +957,7 @@ def admin_send_message():
 
     student_id = request.args.get('student_id')
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("SELECT id, full_name, student_id FROM users WHERE role = 'student'")
     students = cur.fetchall()
     cur.close()
@@ -971,7 +970,7 @@ def mark_message_read(message_id):
         return jsonify({'success': False})
 
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
+    cur = conn.cursor()
     cur.execute("UPDATE messages SET is_read = TRUE WHERE id = %s", (message_id,))
     conn.commit()
     cur.close()
@@ -1011,6 +1010,3 @@ if __name__ == '__main__':
         print("⚠️  PDF export disabled - install reportlab package for PDF support")
 
     app.run(debug=True, port=port, host=host)
-
-
-
