@@ -24,8 +24,20 @@ except ImportError:
     PDF_SUPPORT = False
     print("PDF export disabled - reportlab not installed")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'nemsu_ccms_secret_key_2024')
+
+# Force template reloading and debug info
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_env.auto_reload = True
+
+# Debug template loading
+print("=== TEMPLATE DEBUG INFO ===")
+print(f"Current directory: {os.getcwd()}")
+print(f"Template folder: {app.template_folder}")
+print(f"Templates exist: {os.path.exists('templates')}")
+print(f"Files in templates: {os.listdir('templates') if os.path.exists('templates') else 'NOT FOUND'}")
+print("===========================")
 
 # Disable caching
 @app.after_request
@@ -37,14 +49,139 @@ def add_header(response):
 
 # PostgreSQL Configuration for Render
 def get_db_connection():
-    database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
-    
-    # Fix for Render PostgreSQL URL format
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-    
-    conn = psycopg.connect(database_url, row_factory=dict_row)
-    return conn
+    try:
+        database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
+        
+        # Fix for Render PostgreSQL URL format
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+        
+        print(f"Connecting to database: {database_url.split('@')[1] if '@' in database_url else database_url}")
+        conn = psycopg.connect(database_url, row_factory=dict_row)
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+def init_database():
+    """Initialize database tables if they don't exist"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            print("❌ Cannot initialize database - no connection")
+            return
+            
+        cur = conn.cursor()
+        
+        # Create users table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                student_id VARCHAR(20) UNIQUE,
+                role VARCHAR(20) NOT NULL DEFAULT 'student',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create complaint_categories table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS complaint_categories (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create complaints table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS complaints (
+                id SERIAL PRIMARY KEY,
+                student_id INTEGER REFERENCES users(id),
+                category_id INTEGER REFERENCES complaint_categories(id),
+                incident_date DATE,
+                incident_time TIME,
+                location VARCHAR(200),
+                description TEXT NOT NULL,
+                photo_path VARCHAR(255),
+                status VARCHAR(20) DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create messages table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                sender_id INTEGER REFERENCES users(id),
+                receiver_id INTEGER REFERENCES users(id),
+                message TEXT NOT NULL,
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create admin_responses table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS admin_responses (
+                id SERIAL PRIMARY KEY,
+                complaint_id INTEGER REFERENCES complaints(id),
+                admin_id INTEGER REFERENCES users(id),
+                response TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create feedback table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS feedback (
+                id SERIAL PRIMARY KEY,
+                student_id INTEGER REFERENCES users(id),
+                complaint_id INTEGER REFERENCES complaints(id),
+                rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Insert default complaint categories
+        categories = [
+            ('Academic Issues', 'Problems related to courses, grades, or faculty'),
+            ('Facility Problems', 'Issues with classrooms, buildings, or equipment'),
+            ('Administrative Concerns', 'Problems with registration, records, or offices'),
+            ('Security Issues', 'Safety and security concerns'),
+            ('Other', 'Other types of complaints')
+        ]
+        
+        for category in categories:
+            cur.execute(
+                "INSERT INTO complaint_categories (name, description) VALUES (%s, %s) ON CONFLICT (name) DO NOTHING",
+                category
+            )
+        
+        # Create default admin user
+        admin_password = generate_password_hash('admin123')
+        cur.execute('''
+            INSERT INTO users (username, password, email, full_name, role) 
+            VALUES ('admin', %s, 'admin@nemsu.edu.ph', 'System Administrator', 'admin')
+            ON CONFLICT (username) DO NOTHING
+        ''', (admin_password,))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("✅ Database initialized successfully!")
+        
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+
+# Initialize database when app starts
+init_database()
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -124,6 +261,62 @@ NEMSU Administration"""
     }
 }
 
+# Debug Routes
+@app.route('/debug/db')
+def debug_db():
+    """Check database connection and tables"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check tables
+        cur.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)
+        tables = cur.fetchall()
+        
+        # Check users
+        cur.execute("SELECT COUNT(*) as count FROM users")
+        user_count = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'tables': [table['table_name'] for table in tables],
+            'user_count': user_count['count'],
+            'status': 'Database connected successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/debug/users')
+def debug_users():
+    """Check existing users"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, email, role, student_id FROM users ORDER BY id")
+        users = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        result = []
+        for user in users:
+            result.append({
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'role': user['role'],
+                'student_id': user['student_id']
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 # Main Website Routes
 @app.route('/')
 def index():
@@ -148,6 +341,10 @@ def student_login():
         password = request.form['password']
 
         conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed. Please try again.', 'danger')
+            return render_template('student_login.html')
+            
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'student'", (username,))
         user = cur.fetchone()
@@ -180,8 +377,31 @@ def student_register():
         hashed_password = generate_password_hash(password)
 
         conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed. Please try again.', 'danger')
+            return render_template('student_register.html')
+            
         cur = conn.cursor()
         try:
+            # Check for existing username
+            cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+            if cur.fetchone():
+                flash('Username already exists. Please choose a different username.', 'danger')
+                return render_template('student_register.html')
+            
+            # Check for existing email
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            if cur.fetchone():
+                flash('Email already exists. Please use a different email address.', 'danger')
+                return render_template('student_register.html')
+            
+            # Check for existing student ID
+            cur.execute("SELECT id FROM users WHERE student_id = %s", (student_id,))
+            if cur.fetchone():
+                flash('Student ID already exists. Please check your student ID.', 'danger')
+                return render_template('student_register.html')
+
+            # Insert new student
             cur.execute(
                 "INSERT INTO users (username, password, email, full_name, student_id, role) VALUES (%s, %s, %s, %s, %s, 'student')",
                 (username, hashed_password, email, full_name, student_id)
@@ -189,12 +409,15 @@ def student_register():
             conn.commit()
             flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('student_login'))
+            
         except Exception as e:
             conn.rollback()
-            flash('Registration failed. Username or email may already exist.', 'danger')
+            print(f"Registration error: {str(e)}")
+            flash('Registration failed. Please try again with different information.', 'danger')
         finally:
             cur.close()
             conn.close()
+    
     return render_template('student_register.html')
 
 # Admin Authentication
@@ -208,6 +431,10 @@ def admin_login():
         password = request.form['password']
 
         conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed. Please try again.', 'danger')
+            return render_template('admin_login.html')
+            
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = %s AND role = 'admin'", (username,))
         user = cur.fetchone()
@@ -232,6 +459,10 @@ def student_dashboard():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_login'))
+        
     cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM complaints WHERE student_id = %s", (session['user_id'],))
@@ -277,6 +508,10 @@ def report_complaint():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_dashboard'))
+        
     cur = conn.cursor()
     
     if request.method == 'POST':
@@ -343,6 +578,10 @@ def previous_reports():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_dashboard'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT c.id, cc.name as category, c.status, c.created_at 
@@ -362,6 +601,10 @@ def complaint_details(complaint_id):
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('previous_reports'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT c.*, cc.name as category_name, u.full_name, u.student_id
@@ -397,6 +640,10 @@ def feedback():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_dashboard'))
+        
     cur = conn.cursor()
     cur.execute("SELECT id FROM complaints WHERE student_id = %s AND status = 'Solved'", (session['user_id'],))
     solved_complaints = cur.fetchall()
@@ -444,6 +691,10 @@ def private_message():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_dashboard'))
+        
     cur = conn.cursor()
     
     if request.method == 'POST':
@@ -494,6 +745,10 @@ def student_inbox():
         return redirect(url_for('student_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('student_dashboard'))
+        
     cur = conn.cursor()
 
     # Get messages where student is the receiver
@@ -525,6 +780,10 @@ def admin_dashboard():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_login'))
+        
     cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM users WHERE role = 'student'")
@@ -577,6 +836,10 @@ def manage_students():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+        
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE role = 'student'")
     students = cur.fetchall()
@@ -593,6 +856,10 @@ def manage_complaints():
     status_filter = request.args.get('status', '')
     
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+        
     cur = conn.cursor()
 
     query = """
@@ -628,6 +895,10 @@ def admin_complaint_details(complaint_id):
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('manage_complaints'))
+        
     cur = conn.cursor()
     
     if request.method == 'POST':
@@ -708,6 +979,10 @@ def admin_reports():
     period = request.args.get('period', 'monthly')
     
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+        
     cur = conn.cursor()
 
     cur.execute("""
@@ -758,6 +1033,10 @@ def export_complaints(format_type):
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_reports'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT c.id, c.created_at, cc.name as category, u.full_name, u.student_id, u.email, c.status, c.location, c.description
@@ -906,6 +1185,10 @@ def admin_messages():
         return redirect(url_for('admin_login'))
 
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+        
     cur = conn.cursor()
 
     # Get messages where admin is the receiver (messages from students)
@@ -940,6 +1223,10 @@ def admin_send_message():
         message_text = request.form['message']
 
         conn = get_db_connection()
+        if not conn:
+            flash('Database connection failed. Please try again.', 'danger')
+            return redirect(url_for('admin_messages'))
+            
         cur = conn.cursor()
 
         # Admin sends message to student (admin is sender, student is receiver)
@@ -957,6 +1244,10 @@ def admin_send_message():
 
     student_id = request.args.get('student_id')
     conn = get_db_connection()
+    if not conn:
+        flash('Database connection failed. Please try again.', 'danger')
+        return redirect(url_for('admin_messages'))
+        
     cur = conn.cursor()
     cur.execute("SELECT id, full_name, student_id FROM users WHERE role = 'student'")
     students = cur.fetchall()
@@ -970,6 +1261,9 @@ def mark_message_read(message_id):
         return jsonify({'success': False})
 
     conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False})
+        
     cur = conn.cursor()
     cur.execute("UPDATE messages SET is_read = TRUE WHERE id = %s", (message_id,))
     conn.commit()
