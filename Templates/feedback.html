@@ -1,0 +1,160 @@
+feedback.html
+{% extends "base.html" %}
+
+{% block title %}Feedback - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-comment-alt me-2"></i>Give Feedback
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {% if not feedback_allowed %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-lock display-1 text-warning mb-3"></i>
+                        <h4 class="text-warning">Feedback Not Available</h4>
+                        <p class="text-muted">
+                            You can only submit feedback for complaints that have been marked as "Solved". 
+                            Currently, you don't have any resolved complaints.
+                        </p>
+                        <div class="mt-4">
+                            <a href="{{ url_for('previous_reports') }}" class="btn btn-primary me-2">
+                                <i class="fas fa-history me-2"></i>Check Your Reports
+                            </a>
+                            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-home me-2"></i>Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    {% if solved_complaints %}
+                    <form method="POST">
+                        <div class="mb-4">
+                            <p class="text-muted">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Please provide feedback for one of your resolved complaints. Your feedback helps us improve our services.
+                            </p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="complaint_id" class="form-label">Select Complaint</label>
+                            <select class="form-select" id="complaint_id" name="complaint_id" required>
+                                <option value="">Choose a resolved complaint...</option>
+                                {% for complaint in solved_complaints %}
+                                <option value="{{ complaint.id }}">
+                                    #{{ complaint.id }} - {{ complaint.category }} ({{ complaint.created_at.strftime('%Y-%m-%d') }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Rating</label>
+                            <div class="rating-stars">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="rating" id="rating1" value="1" required>
+                                    <label class="form-check-label" for="rating1">
+                                        <i class="fas fa-star text-warning"></i> 1
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="rating" id="rating2" value="2">
+                                    <label class="form-check-label" for="rating2">
+                                        <i class="fas fa-star text-warning"></i> 2
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="rating" id="rating3" value="3">
+                                    <label class="form-check-label" for="rating3">
+                                        <i class="fas fa-star text-warning"></i> 3
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="rating" id="rating4" value="4">
+                                    <label class="form-check-label" for="rating4">
+                                        <i class="fas fa-star text-warning"></i> 4
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="rating" id="rating5" value="5">
+                                    <label class="form-check-label" for="rating5">
+                                        <i class="fas fa-star text-warning"></i> 5
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="comment" class="form-label">Comments (Optional)</label>
+                            <textarea class="form-control" id="comment" name="comment" rows="4" 
+                                      placeholder="Please share your experience or suggestions for improvement..."></textarea>
+                            <div class="form-text">Your feedback is valuable for improving our services.</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Feedback
+                            </button>
+                            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle display-1 text-success mb-3"></i>
+                        <h4 class="text-success">All Feedback Submitted</h4>
+                        <p class="text-muted">You have already provided feedback for all your resolved complaints.</p>
+                        <a href="{{ url_for('student_dashboard') }}" class="btn btn-primary mt-3">
+                            <i class="fas fa-home me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if feedback_allowed and solved_complaints %}
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Feedback Guidelines
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i> Be specific about what was done well</li>
+                        <li><i class="fas fa-check text-success me-2"></i> Suggest constructive improvements</li>
+                        <li><i class="fas fa-check text-success me-2"></i> Focus on the process, not individuals</li>
+                        <li><i class="fas fa-check text-success me-2"></i> Your feedback is anonymous to staff</li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.rating-stars .form-check-input:checked + .form-check-label {
+    font-weight: bold;
+    color: #ffc107;
+}
+
+.rating-stars .form-check-label {
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.rating-stars .form-check-label:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

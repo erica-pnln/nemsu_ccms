@@ -1,0 +1,63 @@
+student_dashboard.html
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="dashboard-welcome">
+        <h1>Welcome, {{ session.full_name }}!</h1>
+        <p class="lead">North Eastern Mindanao State University - Complaint and Concern Management System</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+            <a href="{{ url_for('report_complaint') }}" class="card action-card">
+                <div class="card-body">
+                    <div class="action-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h5 class="card-title">Report or Complain</h5>
+                    <p class="card-text">Submit a new complaint or report an issue</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-6 col-lg-3">
+            <a href="{{ url_for('previous_reports') }}" class="card action-card">
+                <div class="card-body">
+                    <div class="action-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <h5 class="card-title">Check Previous Reports</h5>
+                    <p class="card-text">View status of your previous complaints</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-6 col-lg-3">
+            <a href="{{ url_for('feedback') }}" class="card action-card">
+                <div class="card-body">
+                    <div class="action-icon">
+                        <i class="fas fa-comment-alt"></i>
+                    </div>
+                    <h5 class="card-title">Give Feedback</h5>
+                    <p class="card-text">Provide feedback on resolved complaints</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-6 col-lg-3">
+            <a href="{{ url_for('private_message') }}" class="card action-card">
+                <div class="card-body">
+                    <div class="action-icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <h5 class="card-title">Private Message to Admin</h5>
+                    <p class="card-text">Send a direct message to administrators</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

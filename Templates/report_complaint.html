@@ -1,0 +1,65 @@
+report_complaint.html
+{% extends "base.html" %}
+
+{% block title %}Report Complaint - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0"><i class="fas fa-exclamation-circle me-2"></i>Report or Complain</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="category" class="form-label">Complaint Category</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">Select a category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="incident_date" class="form-label">Date of Incident</label>
+                                <input type="date" class="form-control" id="incident_date" name="incident_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="incident_time" class="form-label">Time of Incident</label>
+                                <input type="time" class="form-control" id="incident_time" name="incident_time" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location" placeholder="Where did the incident occur?" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="5" placeholder="Please provide a detailed description of your complaint..." required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="photo" class="form-label">Upload Evidence (Optional)</label>
+                            <input class="form-control" type="file" id="photo" name="photo" accept="image/*,.pdf">
+                            <div class="form-text">You can upload images or PDF files (max 16MB)</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary">Submit Complaint</button>
+                            <a href="{{ url_for('student_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

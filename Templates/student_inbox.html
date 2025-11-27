@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Message Inbox - NEMSU CCMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-inbox me-2"></i>My Messages</h2>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('private_message') }}" class="btn btn-primary">
+                <i class="fas fa-paper-plane me-2"></i>New Message
+            </a>
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-comments me-2"></i>Message History
+                <span class="badge bg-light text-primary ms-2">{{ messages|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if messages %}
+            <div class="list-group list-group-flush">
+                {% for message in messages %}
+                <div class="list-group-item {% if not message.is_read %}bg-light{% endif %}">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            {% if message.sender_id == session.user_id %}
+                                <i class="fas fa-paper-plane fa-2x text-primary"></i>
+                            {% else %}
+                                <i class="fas fa-user-shield fa-2x text-success"></i>
+                            {% endif %}
+                        </div>
+                        <div class="col">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        {% if message.sender_id == session.user_id %}
+                                            <i class="fas fa-share text-primary me-1"></i>To: Administrator
+                                        {% else %}
+                                            <i class="fas fa-reply text-success me-1"></i>From: {{ message.sender_name }}
+                                            {% if message.student_id %}
+                                                <small class="text-muted">({{ message.student_id }})</small>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if not message.is_read and message.receiver_id == session.user_id %}
+                                        <span class="badge bg-warning ms-2">New</span>
+                                        {% endif %}
+                                    </h6>
+                                    <p class="mb-2">{{ message.message }}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        {{ message.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox display-1 text-muted mb-3"></i>
+                <h4 class="text-muted">No Messages</h4>
+                <p class="text-muted">You haven't sent or received any messages yet.</p>
+                <a href="{{ url_for('private_message') }}" class="btn btn-primary">
+                    <i class="fas fa-paper-plane me-2"></i>Send Your First Message
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
