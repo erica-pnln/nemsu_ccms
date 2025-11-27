@@ -36,9 +36,11 @@ def add_header(response):
     return response
 
 # PostgreSQL Configuration for Render
+# PostgreSQL Configuration for Render
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
     
+    # Fix for Render PostgreSQL URL format
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     
@@ -1009,5 +1011,6 @@ if __name__ == '__main__':
         print("⚠️  PDF export disabled - install reportlab package for PDF support")
 
     app.run(debug=True, port=port, host=host)
+
 
 
