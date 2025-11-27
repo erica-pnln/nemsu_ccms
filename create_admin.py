@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash
-import psycopg2
-from psycopg2.extras import DictCursor
+import psycopg
+from psycopg.rows import dict_row
 import os
 
 def create_cherlyn_admin():
@@ -14,17 +14,16 @@ def create_cherlyn_admin():
         print("🎯 Creating Admin User: Cherlyn")
         print("=" * 40)
 
-        # Connect to PostgreSQL using direct parameters
-        conn = psycopg2.connect(
-            host='dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com',
-            database='nemsu_ccms_db',
-            user='nemsu_ccms_db_user',
-            password='EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU',
-            port=5432
-        )
-        cursor = conn.cursor(cursor_factory=DictCursor)
+        # Connect to PostgreSQL (Render database)
+        database_url = os.environ.get('DATABASE_URL', 'postgresql://nemsu_ccms_db_user:EAl83jcPEvy8kDYKXMY05Qu8n4WxAamU@dpg-d4jun67diees73b5ld7g-a.oregon-postgres.render.com:5432/nemsu_ccms_db')
+        
+        # Fix for Render PostgreSQL URL format
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+        
+        conn = psycopg.connect(database_url, row_factory=dict_row)
+        cursor = conn.cursor()
 
-        # Rest of the code remains the same...
         # Check if admin already exists
         cursor.execute("SELECT id, username FROM users WHERE username = %s AND role = 'admin'", (username,))
         existing_admin = cursor.fetchone()
@@ -62,12 +61,14 @@ def create_cherlyn_admin():
         print(f"   👩‍💼 Full Name: {full_name}")
         print(f"   🎯 Role: admin")
         
+        # Get the base URL for deployment
         base_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:5001')
         print(f"   🌐 Login URL: {base_url}/admin/login")
 
     except Exception as e:
         print(f"❌ Error: {e}")
     finally:
+        # Close connection
         if 'conn' in locals():
             cursor.close()
             conn.close()
