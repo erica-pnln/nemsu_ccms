@@ -1,124 +1,200 @@
-student_register.html
-{% extends "base.html" %}
-
-{% block title %}Student Registration - NEMSU CCMS{% endblock %}
-
-{% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title mb-0 text-center">
-                        <i class="fas fa-user-plus me-2"></i>Student Registration
-                    </h3>
-                </div>
-                <div class="card-body p-4">
-                    <form method="POST">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="full_name" class="form-label">Full Name</label>
-                                    <input type="text" class="form-control" id="full_name" name="full_name" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="student_id" class="form-label">Student ID</label>
-                                    <input type="text" class="form-control" id="student_id" name="student_id" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="username" class="form-label">Username</label>
-                                    <input type="text" class="form-control" id="username" name="username" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email</label>
-                                    <input type="email" class="form-control" id="email" name="email" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="password" class="form-label">Password</label>
-                                    <input type="password" class="form-control" id="password" name="password" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="confirm_password" class="form-label">Confirm Password</label>
-                                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="terms" required>
-                            <label class="form-check-label" for="terms">
-                                I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
-                            </label>
-                        </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">Register</button>
-                        </div>
-                    </form>
-
-                    <div class="text-center mt-3">
-                        <p>Already have an account? <a href="{{ url_for('student_login') }}">Login here</a></p>
-                        <p><a href="{{ url_for('index') }}">← Back to Home</a></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Terms Modal -->
-<div class="modal fade" id="termsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Terms and Conditions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <h6>NEMSU CCMS - Student Agreement</h6>
-                <p>By registering for the NEMSU Complaint and Case Management System, you agree to:</p>
-                <ul>
-                    <li>Provide accurate and truthful information in all complaints</li>
-                    <li>Use the system responsibly and ethically</li>
-                    <li>Respect the privacy and rights of other users</li>
-                    <li>Not submit false or malicious complaints</li>
-                    <li>Follow university policies and guidelines</li>
-                </ul>
-                <p>Violation of these terms may result in account suspension or disciplinary action.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-document.getElementById('confirm_password').addEventListener('input', function() {
-    const password = document.getElementById('password').value;
-    const confirmPassword = this.value;
-
-    if (password !== confirmPassword) {
-        this.setCustomValidity('Passwords do not match');
-    } else {
-        this.setCustomValidity('');
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const termsCheckbox = document.getElementById('terms');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Real-time password validation
+    function validatePasswords() {
+        if (password.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity('Passwords do not match');
+            confirmPassword.classList.add('is-invalid');
+            confirmPassword.classList.remove('is-valid');
+            
+            // Show error message
+            let errorDiv = confirmPassword.parentNode.querySelector('.password-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'invalid-feedback password-error';
+                confirmPassword.parentNode.appendChild(errorDiv);
+            }
+            errorDiv.textContent = 'Passwords do not match';
+            return false;
+        } else {
+            confirmPassword.setCustomValidity('');
+            confirmPassword.classList.remove('is-invalid');
+            confirmPassword.classList.add('is-valid');
+            
+            // Remove error message
+            const errorDiv = confirmPassword.parentNode.querySelector('.password-error');
+            if (errorDiv) {
+                errorDiv.remove();
+            }
+            return true;
+        }
     }
+    
+    // Password strength indicator
+    function checkPasswordStrength() {
+        const pass = password.value;
+        const strengthText = document.getElementById('password-strength');
+        
+        if (!strengthText) {
+            const div = document.createElement('div');
+            div.id = 'password-strength';
+            div.className = 'form-text mt-1';
+            password.parentNode.appendChild(div);
+        }
+        
+        const strengthDiv = document.getElementById('password-strength');
+        let strength = 0;
+        let message = '';
+        let color = '';
+        
+        // Length check
+        if (pass.length >= 8) strength++;
+        if (pass.length >= 12) strength++;
+        
+        // Complexity checks
+        if (/[a-z]/.test(pass)) strength++;
+        if (/[A-Z]/.test(pass)) strength++;
+        if (/[0-9]/.test(pass)) strength++;
+        if (/[^A-Za-z0-9]/.test(pass)) strength++;
+        
+        // Determine strength level
+        if (pass.length === 0) {
+            message = 'Enter a password';
+            color = 'text-muted';
+        } else if (pass.length < 6) {
+            message = 'Very weak';
+            color = 'text-danger';
+        } else if (strength <= 2) {
+            message = 'Weak';
+            color = 'text-danger';
+        } else if (strength <= 4) {
+            message = 'Good';
+            color = 'text-warning';
+        } else if (strength <= 5) {
+            message = 'Strong';
+            color = 'text-success';
+        } else {
+            message = 'Very strong';
+            color = 'text-success';
+        }
+        
+        strengthDiv.innerHTML = `<small class="${color}"><i class="fas fa-shield-alt me-1"></i> ${message}</small>`;
+    }
+    
+    // Student ID validation
+    function validateStudentId() {
+        const studentIdInput = document.getElementById('student_id');
+        const studentId = studentIdInput.value.trim().toUpperCase();
+        
+        // Remove any existing validation
+        studentIdInput.classList.remove('is-invalid', 'is-valid');
+        
+        // Check for existing error message
+        let errorDiv = studentIdInput.parentNode.querySelector('.studentid-error');
+        if (errorDiv) {
+            errorDiv.remove();
+        }
+        
+        if (studentId.length < 3) {
+            studentIdInput.classList.add('is-invalid');
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'invalid-feedback studentid-error';
+            errorDiv.textContent = 'Student ID must be at least 3 characters';
+            studentIdInput.parentNode.appendChild(errorDiv);
+            return false;
+        }
+        
+        // Format validation (adjust based on your student ID format)
+        if (!/^[A-Z0-9-]+$/.test(studentId)) {
+            studentIdInput.classList.add('is-invalid');
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'invalid-feedback studentid-error';
+            errorDiv.textContent = 'Student ID can only contain letters, numbers, and hyphens';
+            studentIdInput.parentNode.appendChild(errorDiv);
+            return false;
+        }
+        
+        studentIdInput.classList.add('is-valid');
+        return true;
+    }
+    
+    // Email validation
+    function validateEmail() {
+        const emailInput = document.getElementById('email');
+        const email = emailInput.value.trim();
+        
+        emailInput.classList.remove('is-invalid', 'is-valid');
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            emailInput.classList.add('is-invalid');
+            return false;
+        }
+        
+        emailInput.classList.add('is-valid');
+        return true;
+    }
+    
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate all fields
+        const isPasswordsValid = validatePasswords();
+        const isStudentIdValid = validateStudentId();
+        const isEmailValid = validateEmail();
+        const isTermsAccepted = termsCheckbox.checked;
+        
+        if (!isTermsAccepted) {
+            termsCheckbox.classList.add('is-invalid');
+            alert('Please accept the Terms and Conditions');
+            return false;
+        } else {
+            termsCheckbox.classList.remove('is-invalid');
+        }
+        
+        if (!isPasswordsValid || !isStudentIdValid || !isEmailValid) {
+            alert('Please fix the errors in the form before submitting.');
+            return false;
+        }
+        
+        // Disable submit button and show loading
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Registering...
+            `;
+        }
+        
+        // Submit the form
+        this.submit();
+    });
+    
+    // Real-time validation events
+    password.addEventListener('input', function() {
+        validatePasswords();
+        checkPasswordStrength();
+    });
+    
+    confirmPassword.addEventListener('input', validatePasswords);
+    document.getElementById('student_id').addEventListener('blur', validateStudentId);
+    document.getElementById('email').addEventListener('blur', validateEmail);
+    
+    // Terms checkbox validation
+    termsCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            this.classList.remove('is-invalid');
+        }
+    });
+    
+    // Initial validation
+    checkPasswordStrength();
 });
 </script>
-{% endblock %}
